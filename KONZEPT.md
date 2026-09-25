@@ -1,6 +1,6 @@
-# Orbit-Kette – Spielkonzept (Arbeitstitel)
+# Orbits – Spielkonzept (Arbeitstitel, im Brainstorming „Orbit-Kette“)
 
-> Stand: 2026-09-25 · Ergebnis einer Brainstorming-Session (Mensch + KI).
+> Stand: 2026-09-25 · Ergebnis einer Brainstorming-Session (Mensch + KI), Prototyp v0.1 umgesetzt.
 > Zweck dieser Datei: Übergabe an Entwickler/KI – alles, was bisher entschieden ist, was offen ist und was als Nächstes kommt.
 > Sprache des Spiels & der Doku: Deutsch.
 
@@ -100,20 +100,41 @@ Gewünschte Gänsehaut-Momente (alle drei bestätigt):
 - Speicherung: Fortschritt, Upgrades, Bestzeiten in localStorage/IndexedDB.
 - Optional später: Ghost-Replay der Bestzeit (Eingaben aufzeichnen – funktioniert nur bei deterministischer Physik).
 
-## 11. Offene Fragen
+## 11. Stand der Umsetzung: Prototyp v0.1
 
-1. Neustart nach Scheitern: sofort per Tipp (Super-Meat-Boy-Stil) oder kurzer Moment, der zeigt, warum?
-2. Übergang zwischen Ringen: exakt durch die Öffnung oder Einfangzone?
+Umgesetzt: PWA-Grundgerüst, 3 Level (Erste Bahn, Versatz, Umkehr), Run-Modus mit Gesamtzeit, Übungsmodus, Bestzeiten, zwei Steuerungsarten, Klang, Tests mit Autopilot. Aufbau siehe `README.md`.
+
+**Vorläufige Regeln im Prototyp** (zum Testen gedacht, jederzeit änderbar):
+- **Innenwand = Ball verloren** (wie bei Pong), **Außenwand = Bande** (prallt ab). Die Kanten der Öffnung prallen immer ab.
+- **Abprall wie bei Pong/Arkanoid:** Die Trefferstelle auf dem Schläger bestimmt den Winkel (Mitte = gerade zurück, Rand = bis ca. 57°), der Einfallswinkel zählt nicht.
+- **Eine Öffnung pro Ring**, durch die der Ball hinein und hinaus muss. Übergang: exakt durch die Öffnung (keine Einfangzone).
+- Betritt der Ball einen neuen Ring, springt der Schläger dorthin, gegenüber der Öffnung.
+- Schlägergeschwindigkeit begrenzt (10 rad/s), auch im Zeigen-Modus.
+- Berührungen gelten pro Ring; kehrt der Ball in einen Ring zurück, zählen die bereits verbrauchten weiter.
+- Punkte = übrige Berührungen × 100, übersprungene Ringe zählen voll (belohnt Skips).
+- Fehler: kurze Anzeige (0,7 s), dann Neustart des Versuchs. Neuer Abschuss per Tipp.
+- Zeitmessung über Simulationsschritte (deterministisch). Die Uhr startet mit dem ersten Abschuss eines Levels und läuft bei Fehlern weiter; zwischen den Leveln steht sie.
+- Ball fliegt aus dem Spielfeld oder ist 8 s außerhalb aller Ringe → Fehler.
+- Kamera zeigt aktuellen und nächsten Ring; kein Zoom per Pinch.
+
+## 12. Offene Fragen
+
+1. Neustart nach Scheitern: sofort per Tipp (Super-Meat-Boy-Stil) oder kurzer Moment, der zeigt, warum? *(v0.1: kurzer Moment mit Grund, dann Tipp)*
+2. Übergang zwischen Ringen: exakt durch die Öffnung oder Einfangzone? *(v0.1: exakt)*
 3. Wie viel Kontrolle in der Außenwelt außer Zeitlupe (z. B. ein Impuls-Tipp)?
 4. Finale Build-Themen und Upgrade-Liste.
 5. Kamera endgültig (Zoom-Kosten ja/nein).
-6. Name des Spiels.
-7. Optik-Stil (minimalistisch-Neon / organisch / technisch).
+6. Name des Spiels. *(Arbeitstitel: Orbits)*
+7. Optik-Stil (minimalistisch-Neon / organisch / technisch). *(v0.1: minimalistisch-Neon)*
+8. Innenwand tödlich oder Bande? Welche Steuerung (Schieben/Zeigen) fühlt sich besser an? *(nach Test auf dem Handy entscheiden)*
 
-## 12. Nächste Schritte (Prototyp v0.1)
+## 13. Nächste Schritte
 
-1. Repo anlegen, PWA-Grundgerüst (index.html, manifest, service worker, Icons).
-2. Ein Ring, Schläger auf der Kreisschiene (Touch: Daumen ziehen), Ball mit deterministischer Physik, Öffnung.
-3. Zweiter Ring + Übergang, Berührungslimit, Neustart.
-4. Ein Außenwelt-Element (Zahnrad), Zeitlupe.
-5. Timer + 2–3 Testlevel → Spielgefühl prüfen, erst dann Build-System.
+- [x] Repo anlegen, PWA-Grundgerüst (index.html, manifest, service worker, Icons).
+- [x] Ring, Schläger auf der Kreisschiene, Ball mit deterministischer Physik, Öffnung.
+- [x] Mehrere Ringe + Übergang, Berührungslimit, Neustart.
+- [x] Timer, Run-Modus, 3 Testlevel.
+- [ ] Spielgefühl auf dem Handy testen, Regeln aus Abschnitt 11 bestätigen oder ändern.
+- [ ] Erstes Außenwelt-Element (Zahnrad) und Zeitlupe (v0.2).
+- [ ] Billardkugeln, Pinch-Zoom, weitere Level.
+- [ ] Erst danach: Upgrades und Build-System.
