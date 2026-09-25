@@ -7,3 +7,4 @@
 - Bei jeder Änderung an ausgelieferten Dateien `CACHE` in `sw.js` hochzählen und neue Dateien in `FILES` eintragen.
 - Sprache für UI, Doku und Commit-Messages: Deutsch. Zahlen im deutschen Format (Komma als Dezimaltrennzeichen).
 - Entscheidungen, die im Gespräch getroffen werden, in `KONZEPT.md` nachtragen (offene Fragen abhaken, neue ergänzen).
+- Updates direkt auf `main` committen und pushen (ausdrücklicher Wunsch des Besitzers), keine Pull Requests. Vorher `npm test` – `main` wird über GitHub Pages ausgeliefert.
