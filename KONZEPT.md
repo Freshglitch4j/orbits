@@ -27,11 +27,11 @@ Ein Physik-Geschicklichkeitsspiel, abgeleitet von „Circle Pong“: Der Spieler
 
 - Ein **Level** = mehrere **Ringe** (fast vollständige Kreise mit **einer Öffnung**) + die **Außenwelt** dazwischen/darum herum + ein Ziel (letzter Ring / Zielzone).
 - Der **Schläger** ist ein Kreissegment und fährt auf der Schiene des **aktuellen** Rings (wie auf einer Schiene, der Kreis selbst ist sichtbar als Wand bzw. Bahn).
-- **Berührungslimit pro Ring** (z. B. 5): Ist es aufgebraucht, bevor der Ball den nächsten Ring erreicht → **Level startet neu**.
+- **Berührungslimit** *(geändert in v0.2)*: Der Schläger ist unbegrenzt; begrenzt sind die Berührungen der Innenwände, als Zähler für das ganze Level. Bei 0 ist die nächste Innenwand-Berührung tödlich → **Level startet neu**.
 - Verlässt der Ball den Ring durch die Öffnung, fliegt er durch die **Außenwelt** und soll in den **nächsten Ring** gelangen; der Schläger wechselt auf dessen Schiene.
   - OFFEN: Muss der Ball exakt durch die Öffnung des nächsten Rings, oder wird er in der Nähe „eingefangen“?
 - **Zeitlupen-Fenster**: Basisfähigkeit aller Spieler. Kurzes Eingriffsfenster (v. a. in der Außenwelt). Upgrades verlängern die verfügbare Zeitlupe.
-- **Punkte**: Nicht verbrauchte Berührungen → Punkte → schalten Upgrades frei. (Belohnt effizientes Spiel = passt zum Speedrun.)
+- **Punkte**: Nicht verbrauchte Wandberührungen → Punkte → schalten Upgrades frei. (Belohnt effizientes Spiel = passt zum Speedrun.)
 - **Physik muss deterministisch sein** (fester Zeitschritt, kein Zufall), damit Routen und Skips reproduzierbar sind.
 
 ## 5. Außenwelt
@@ -100,18 +100,21 @@ Gewünschte Gänsehaut-Momente (alle drei bestätigt):
 - Speicherung: Fortschritt, Upgrades, Bestzeiten in localStorage/IndexedDB.
 - Optional später: Ghost-Replay der Bestzeit (Eingaben aufzeichnen – funktioniert nur bei deterministischer Physik).
 
-## 11. Stand der Umsetzung: Prototyp v0.1
+## 11. Stand der Umsetzung: Prototyp v0.2
 
-Umgesetzt: PWA-Grundgerüst, 3 Level (Erste Bahn, Versatz, Umkehr), Run-Modus mit Gesamtzeit, Übungsmodus, Bestzeiten, zwei Steuerungsarten, Klang, Tests mit Autopilot. Aufbau siehe `README.md`.
+Umgesetzt: PWA-Grundgerüst, 3 Level (Erste Bahn, Versatz, Umkehr), Run-Modus mit Gesamtzeit, Übungsmodus, Bestzeiten, drei Steuerungsarten (Steuerkreis, Schieben, Zeigen), Tempo-Einstellung zum Testen, Klang, Tests mit Autopilot. Aufbau siehe `README.md`.
+
+**Nach dem ersten Handytest (Galaxy A55) geändert:**
+- Ball war zu schnell → Einstellung **Tempo** (50–120 %, Standard 70 %). Bestzeiten werden je Tempo getrennt gespeichert.
+- Finger verdeckten das Spielfeld → **Steuerkreis** (Standard): ein Kreis unten, außerhalb des Spielfelds. Die Richtung des Daumens vom Kreismittelpunkt ist die Position des Schlägers auf dem Ring. Der Kreis zeigt den aktiven Ring als Miniatur mit Öffnung und Schläger.
+- **Neue Berührungsregel (ersetzt das Limit pro Ring):** Der Schläger darf beliebig oft berührt werden. Begrenzt sind die **Berührungen der Innenwände**, als Zähler für das ganze Level (Level 1: 10, Level 2: 8, Level 3: 6). Die Innenwand prallt ab und zählt herunter; bei 0 ist der Ball bei der nächsten Innenwand-Berührung verloren. Punkte = übrige Wandberührungen × 100.
 
 **Vorläufige Regeln im Prototyp** (zum Testen gedacht, jederzeit änderbar):
-- **Innenwand = Ball verloren** (wie bei Pong), **Außenwand = Bande** (prallt ab). Die Kanten der Öffnung prallen immer ab.
+- **Innenwand** prallt ab und kostet eine Wandberührung (siehe oben), **Außenwand = Bande** ohne Kosten. Die Kanten der Öffnung prallen immer ab.
 - **Abprall wie bei Pong/Arkanoid:** Die Trefferstelle auf dem Schläger bestimmt den Winkel (Mitte = gerade zurück, Rand = bis ca. 57°), der Einfallswinkel zählt nicht.
 - **Eine Öffnung pro Ring**, durch die der Ball hinein und hinaus muss. Übergang: exakt durch die Öffnung (keine Einfangzone).
 - Betritt der Ball einen neuen Ring, springt der Schläger dorthin, gegenüber der Öffnung.
 - Schlägergeschwindigkeit begrenzt (10 rad/s), auch im Zeigen-Modus.
-- Berührungen gelten pro Ring; kehrt der Ball in einen Ring zurück, zählen die bereits verbrauchten weiter.
-- Punkte = übrige Berührungen × 100, übersprungene Ringe zählen voll (belohnt Skips).
 - Fehler: kurze Anzeige (0,7 s), dann Neustart des Versuchs. Neuer Abschuss per Tipp.
 - Zeitmessung über Simulationsschritte (deterministisch). Die Uhr startet mit dem ersten Abschuss eines Levels und läuft bei Fehlern weiter; zwischen den Leveln steht sie.
 - Ball fliegt aus dem Spielfeld oder ist 8 s außerhalb aller Ringe → Fehler.
@@ -126,7 +129,9 @@ Umgesetzt: PWA-Grundgerüst, 3 Level (Erste Bahn, Versatz, Umkehr), Run-Modus mi
 5. Kamera endgültig (Zoom-Kosten ja/nein).
 6. Name des Spiels. *(Arbeitstitel: Orbits)*
 7. Optik-Stil (minimalistisch-Neon / organisch / technisch). *(v0.1: minimalistisch-Neon)*
-8. Innenwand tödlich oder Bande? Welche Steuerung (Schieben/Zeigen) fühlt sich besser an? *(nach Test auf dem Handy entscheiden)*
+8. ~~Innenwand tödlich oder Bande?~~ Entschieden: Bande mit begrenztem Zähler pro Level. Steuerung: Steuerkreis als Standard, weiter testen.
+9. Soll der Wandzähler pro Level bleiben oder pro Ring gelten? Wie belohnt man Skips, wenn Punkte aus übrigen Wandberührungen kommen?
+10. Welches Tempo wird der Standard, wenn die Testphase vorbei ist?
 
 ## 13. Nächste Schritte
 

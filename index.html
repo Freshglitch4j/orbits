@@ -16,6 +16,7 @@
 </head>
 <body>
 <canvas id="spiel"></canvas>
+<div id="safe-unten" aria-hidden="true"></div>
 
 <div id="hud" hidden>
   <button id="pause" class="rund" aria-label="Pause">
@@ -25,7 +26,10 @@
     <div id="zeit">0:00,00</div>
     <div id="level-info"></div>
   </div>
-  <div id="versuche"></div>
+  <div id="wand" aria-label="Verbleibende Wandberührungen">
+    <div id="wand-zahl">10</div>
+    <div class="wand-label">Wand</div>
+  </div>
 </div>
 
 <div id="meldung" hidden>
@@ -36,15 +40,16 @@
 <section id="menue" class="bildschirm">
   <div class="karte">
     <h1>Orbits</h1>
-    <p class="unterzeile">Prototyp v0.1</p>
+    <p class="unterzeile">Prototyp v0.2</p>
     <button id="run-start" class="haupt">Run starten</button>
     <p id="run-best" class="klein"></p>
     <button id="uebung-oeffnen">Level üben</button>
     <div class="einstellungen">
-      <button id="steuerung" class="schalter"></button>
+      <button id="steuerung" class="schalter breit"></button>
+      <button id="tempo" class="schalter"></button>
       <button id="ton" class="schalter"></button>
     </div>
-    <p class="klein anleitung">Schieb den Schläger entlang des Rings, fang den Ball und schick ihn durch die Öffnung in den nächsten Ring. Jeder Ring erlaubt nur wenige Berührungen. Die Uhr läuft, bis du im goldenen Ring bist.</p>
+    <p class="klein anleitung">Schieb den Schläger entlang des Rings, fang den Ball und schick ihn durch die Öffnung in den nächsten Ring. Der Schläger darf beliebig oft, die Innenwände nur begrenzt: Der Zähler oben rechts zeigt, wie viele Wandberührungen noch übrig sind. Die Uhr läuft, bis du im goldenen Ring bist.</p>
   </div>
 </section>
 

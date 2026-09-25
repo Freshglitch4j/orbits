@@ -56,12 +56,31 @@ canvas#spiel {
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.5px;
 }
-#level-info, #versuche {
+#level-info {
   font-size: 13px;
   color: var(--text-2);
   margin-top: 2px;
 }
-#versuche { text-align: right; padding-top: 12px; }
+#wand { text-align: right; }
+#wand-zahl {
+  display: inline-block;
+  font-size: 30px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: #FF8C5A;
+  transform-origin: right center;
+}
+#wand.null #wand-zahl { color: var(--rot); }
+.wand-label { font-size: 12px; color: var(--text-2); margin-top: -2px; }
+
+#safe-unten {
+  position: fixed;
+  left: 0; bottom: 0;
+  width: 1px;
+  height: var(--unten);
+  visibility: hidden;
+  pointer-events: none;
+}
 
 button.rund {
   width: 44px; height: 44px;
@@ -135,6 +154,7 @@ h2 { margin: 0 0 16px; font-size: 22px; }
 }
 .karte button:active { transform: scale(0.98); }
 .einstellungen { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+.einstellungen .breit { grid-column: 1 / -1; }
 .einstellungen button.schalter { margin: 0; font-size: 14px; }
 
 #level-liste button {

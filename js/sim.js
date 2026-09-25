@@ -34,14 +34,13 @@ export function angDiff(a, b) {
 export const paddleRadius = ring => ring.r - PADDLE_INSET;
 export const paddleHalf = ring => PADDLE_LEN / 2 / paddleRadius(ring);
 
-export function createState(level) {
+/** speedFactor verändert das Balltempo (Testeinstellung), 1 = Tempo aus den Leveldaten. */
+export function createState(level, { speedFactor = 1 } = {}) {
   const rings = level.rings.map(r => ({
     x: r.x, y: r.y, r: r.r,
     gap: rad(r.gap),
     half: rad(r.gapWidth) / 2,
     goal: !!r.goal,
-    maxTouches: r.touches ?? level.touches,
-    touches: 0,
   }));
   const bounds = {
     minX: Math.min(...rings.map(r => r.x - r.r)) - OUT_MARGIN,
@@ -51,6 +50,9 @@ export function createState(level) {
   };
   const s = {
     level, rings, bounds,
+    speed: level.speed * speedFactor,
+    maxWallHits: level.wallHits,
+    wallLeft: level.wallHits,   // erlaubte Berührungen der Innenwände, für das ganze Level
     ball: { x: 0, y: 0, vx: 0, vy: 0 },
     active: 0,              // Ring, auf dessen Schiene der Schläger gerade fährt
     paddle: 0,              // Schlägerwinkel (nicht normiert)
@@ -71,7 +73,7 @@ export function resetAttempt(s) {
   const ring = s.rings[st.ring];
   s.active = st.ring;
   s.ball = { x: ring.x, y: ring.y, vx: 0, vy: 0 };
-  for (const r of s.rings) r.touches = r.maxTouches;
+  s.wallLeft = s.maxWallHits;
   s.paddle = s.paddleTarget = rad(st.paddle);
   s.phase = 'ready';
   s.failReason = null;
@@ -82,8 +84,8 @@ export function resetAttempt(s) {
 export function launch(s) {
   if (s.phase !== 'ready') return false;
   const a = rad(s.level.start.dir);
-  s.ball.vx = Math.cos(a) * s.level.speed;
-  s.ball.vy = Math.sin(a) * s.level.speed;
+  s.ball.vx = Math.cos(a) * s.speed;
+  s.ball.vy = Math.sin(a) * s.speed;
   s.phase = 'play';
   s.events.push({ type: 'start' });
   return true;
@@ -187,8 +189,8 @@ function collideRing(s, i, px, py) {
   const inGap = Math.abs(angDiff(ang, ring.gap)) < ring.half;
 
   if (wasInside) {
-    // Schläger: nur auf dem aktiven Ring und solange Berührungen übrig sind
-    if (i === s.active && !ring.goal && ring.touches > 0) {
+    // Schläger: nur auf dem aktiven Ring, beliebig oft
+    if (i === s.active && !ring.goal) {
       const pr = paddleRadius(ring);
       const inner = pr - PADDLE_T / 2;
       const vr = (b.vx * dx + b.vy * dy) / d;
@@ -205,15 +207,25 @@ function collideRing(s, i, px, py) {
           const pd = inner - BALL_R;
           b.x = ring.x + dx / d * pd;
           b.y = ring.y + dy / d * pd;
-          ring.touches--;
-          s.events.push({ type: 'schlag', ring: i, left: ring.touches });
+          s.events.push({ type: 'schlag', ring: i });
           return;
         }
       }
     }
-    // Innenwand: Ball verloren
+    // Innenwand: prallt ab und kostet eine Wandberührung; sind keine mehr übrig, ist der Ball verloren
     if (d + BALL_R >= ring.r - WALL / 2 && !inGap) {
-      fail(s, i === s.active && ring.touches === 0 ? 'leer' : 'wand');
+      if (s.wallLeft <= 0) {
+        fail(s, 'wand');
+        return;
+      }
+      const nx = -dx / d, ny = -dy / d;
+      if (reflect(b, nx, ny)) {
+        s.wallLeft--;
+        s.events.push({ type: 'wand', ring: i, left: s.wallLeft, x: ring.x - nx * ring.r, y: ring.y - ny * ring.r });
+      }
+      const pd = ring.r - WALL / 2 - BALL_R;
+      b.x = ring.x - nx * pd;
+      b.y = ring.y - ny * pd;
     }
   } else {
     // Außenwand: Ball prallt ab (Bande)
@@ -245,11 +257,7 @@ function enterRing(s, i) {
   s.events.push({ type: 'rein', ring: i });
 }
 
-/** Punkte für nicht verbrauchte Berührungen; übersprungene Ringe zählen voll. */
+/** Punkte für nicht verbrauchte Wandberührungen. */
 export function score(s) {
-  return s.rings.reduce((sum, r) => sum + (r.goal ? 0 : r.touches * 100), 0);
-}
-
-export function touchesLeft(s) {
-  return s.rings.reduce((sum, r) => sum + (r.goal ? 0 : r.touches), 0);
+  return s.wallLeft * 100;
 }

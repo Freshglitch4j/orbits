@@ -11,9 +11,11 @@ test('angDiff liefert die kürzeste Differenz', () => {
 });
 
 for (const level of LEVELS) {
-  test(`${level.name}: mit dem Autopiloten lösbar`, () => {
-    const res = autoplay(createState(level));
-    assert.equal(res.won, true, `Autopilot scheitert: ${res.reason}`);
+  test(`${level.name}: mit dem Autopiloten lösbar, bei jedem Tempo`, () => {
+    for (const tempo of [50, 60, 70, 80, 90, 100, 110, 120]) {
+      const res = autoplay(createState(level, { speedFactor: tempo / 100 }));
+      assert.equal(res.won, true, `Tempo ${tempo} %: Autopilot scheitert (${res.reason})`);
+    }
   });
 }
 
@@ -26,8 +28,8 @@ test('Physik ist deterministisch', () => {
   assert.deepEqual(a.ball, b.ball);
 });
 
-test('Ohne Schläger geht der Ball an der Wand verloren', () => {
-  const s = createState({ ...LEVELS[0], start: { ring: 0, dir: 0, paddle: 180 } });
+test('Ohne Wandberührungen geht der Ball an der Wand verloren', () => {
+  const s = createState({ ...LEVELS[0], wallHits: 0, start: { ring: 0, dir: 0, paddle: 180 } });
   launch(s);
   for (let n = 0; n < 240 && s.phase === 'play'; n++) step(s);
   assert.equal(s.phase, 'fail');
@@ -35,9 +37,29 @@ test('Ohne Schläger geht der Ball an der Wand verloren', () => {
 });
 
 test('Nach einem Fehler startet der Versuch neu', () => {
-  const s = createState({ ...LEVELS[0], start: { ring: 0, dir: 0, paddle: 180 } });
+  const s = createState({ ...LEVELS[0], wallHits: 0, start: { ring: 0, dir: 0, paddle: 180 } });
   launch(s);
   for (let n = 0; n < Math.round(2 / DT); n++) step(s);
   assert.equal(s.phase, 'ready');
   assert.deepEqual(s.ball, { x: 0, y: 0, vx: 0, vy: 0 });
+});
+
+test('Innenwand prallt ab und zählt herunter, bei 0 ist der Ball verloren', () => {
+  const s = createState({ ...LEVELS[0], wallHits: 2, start: { ring: 0, dir: 0, paddle: 180 } });
+  launch(s);
+  const hits = [];
+  for (let n = 0; n < Math.round(10 / DT) && s.phase === 'play'; n++) {
+    step(s);
+    for (const e of s.events) if (e.type === 'wand') hits.push(e.left);
+    s.events.length = 0;
+  }
+  assert.deepEqual(hits, [1, 0]);
+  assert.equal(s.phase, 'fail');
+  assert.equal(s.failReason, 'wand');
+});
+
+test('Tempo-Faktor verändert die Ballgeschwindigkeit', () => {
+  const s = createState(LEVELS[0], { speedFactor: 0.5 });
+  launch(s);
+  assert.ok(Math.abs(Math.hypot(s.ball.vx, s.ball.vy) - LEVELS[0].speed * 0.5) < 1e-9);
 });

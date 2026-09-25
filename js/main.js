@@ -3,7 +3,7 @@
 import {
   DT, TAU, BALL_R, WALL, PADDLE_T, PADDLE_SPEED,
   createState, step, launch, resetAttempt, nudgePaddle, aimPaddle,
-  paddleRadius, paddleHalf, score, touchesLeft,
+  paddleRadius, paddleHalf, score,
 } from './sim.js';
 import { LEVELS } from './levels.js';
 
@@ -15,21 +15,22 @@ const COL = {
   oeffnung: 'rgba(55, 226, 255, 0.35)',
   gold: '#F7C548',
   schlaeger: '#37E2FF',
-  schlaegerLeer: 'rgba(55, 226, 255, 0.22)',
   ball: '#FFFFFF',
   rot: '#FF4D6A',
-  punkt: 'rgba(220, 228, 255, 0.6)',
-  punktLeer: 'rgba(220, 228, 255, 0.12)',
+  funke: 'rgba(255, 140, 90,',
+  kreis: 'rgba(220, 228, 255, 0.35)',
 };
 
 const FEHLER = {
-  wand: ['Ball verloren', 'Der Ball hat die Innenwand berührt.'],
-  leer: ['Keine Berührungen mehr', 'Jeder Ring erlaubt nur wenige Schläge.'],
+  wand: ['Ball verloren', 'Keine Wandberührungen mehr übrig.'],
   leere: ['Ins Leere geflogen', 'Der Ball hat das Spielfeld verlassen.'],
   verirrt: ['Ball verirrt', 'Zu lange außerhalb der Ringe.'],
 };
 
 const SCHIEBE_GAIN = 1.3;   // Empfindlichkeit beim Schieben
+const TEMPI = [50, 60, 70, 80, 90, 100, 110, 120];   // Balltempo in Prozent (Testeinstellung)
+const STEUERUNGEN = { kreis: 'Steuerkreis', schieben: 'Schieben', zeigen: 'Zeigen' };
+const DIAL_R = 62;          // Radius des Steuerkreises in Pixeln
 
 const $ = id => document.getElementById(id);
 const canvas = $('spiel');
@@ -39,15 +40,22 @@ const hud = $('hud');
 /* ---------- Speicher ---------- */
 
 const KEY = 'orbits.v1';
-const store = { settings: { steuerung: 'schieben', ton: true }, best: { run: null, levels: {} } };
+// best: Zeitschritte je Level-ID bzw. 'run', bei anderem Tempo als 100 % mit „@Tempo“ dahinter
+const store = { version: 2, settings: { steuerung: 'kreis', ton: true, tempo: 70 }, best: {} };
 try {
   const d = JSON.parse(localStorage.getItem(KEY) || '{}');
-  Object.assign(store.settings, d.settings);
-  if (d.best) {
-    store.best.run = d.best.run ?? null;
-    store.best.levels = { ...d.best.levels };
+  if (d.version === 2) {
+    Object.assign(store.settings, d.settings);
+    Object.assign(store.best, d.best);
+  } else if (d.best) {
+    // Stand v0.1: Einstellungen auf die neuen Vorgaben setzen, Bestzeiten (Tempo 100 %) übernehmen
+    Object.assign(store.best, d.best.levels);
+    if (d.best.run != null) store.best.run = d.best.run;
+    if (d.settings) store.settings.ton = d.settings.ton !== false;
   }
 } catch { /* ohne Speicher spielbar */ }
+
+const bestKey = id => store.settings.tempo === 100 ? id : `${id}@${store.settings.tempo}`;
 
 function save() {
   try { localStorage.setItem(KEY, JSON.stringify(store)); } catch { /* ignorieren */ }
@@ -97,7 +105,7 @@ function startLevel(mode, index, runSteps = 0, results = []) {
   const level = LEVELS[index];
   game = {
     mode, index, level, results, runSteps,
-    s: createState(level),
+    s: createState(level, { speedFactor: store.settings.tempo / 100 }),
     levelSteps: 0,
     started: false,
     paused: false,
@@ -106,6 +114,8 @@ function startLevel(mode, index, runSteps = 0, results = []) {
     dialogShown: false,
     trail: [],
     flash: 0,
+    sparks: [],
+    wallAnim: 0,
   };
   pointerId = null;
   showScreen(null);
@@ -152,17 +162,18 @@ function restartLevel() {
 function win() {
   const g = game;
   g.winT = 0;
-  const id = g.level.id;
-  const prev = store.best.levels[id];
+  const key = bestKey(g.level.id);
+  const prev = store.best[key];
   g.newBest = prev == null || g.levelSteps < prev;
-  if (g.newBest) store.best.levels[id] = g.levelSteps;
+  if (g.newBest) store.best[key] = g.levelSteps;
   g.points = score(g.s);
-  g.left = touchesLeft(g.s);
+  g.left = g.s.wallLeft;
   if (g.mode === 'run') {
     g.results.push({ name: g.level.name, steps: g.levelSteps });
     if (g.index === LEVELS.length - 1) {
-      g.runNewBest = store.best.run == null || g.runSteps < store.best.run;
-      if (g.runNewBest) store.best.run = g.runSteps;
+      const rk = bestKey('run');
+      g.runNewBest = store.best[rk] == null || g.runSteps < store.best[rk];
+      if (g.runNewBest) store.best[rk] = g.runSteps;
     }
   }
   save();
@@ -181,7 +192,7 @@ function showWinDialog() {
   if (g.mode === 'run' && last) {
     const rows = g.results.map((r, i) => [`${i + 1} · ${r.name}`, zeit(r.steps)]);
     rows.push(['Gesamtzeit', zeit(g.runSteps), g.runNewBest]);
-    rows.push(['Bestzeit Run', zeit(store.best.run)]);
+    rows.push(['Bestzeit Run', zeit(store.best[bestKey('run')])]);
     dialog(g.runNewBest ? 'Neue Bestzeit!' : 'Run geschafft!', rows, [
       ['Neuer Run', () => startLevel('run', 0), true],
       ['Zum Menü', toMenu],
@@ -191,9 +202,9 @@ function showWinDialog() {
 
   const rows = [
     ['Levelzeit', zeit(g.levelSteps), g.newBest],
-    ['Bestzeit', zeit(store.best.levels[g.level.id])],
+    ['Bestzeit', zeit(store.best[bestKey(g.level.id)])],
     ['Versuche', String(g.tries)],
-    ['Berührungen übrig', String(g.left)],
+    ['Wandberührungen übrig', String(g.left)],
     ['Punkte', g.points.toLocaleString('de-AT')],
   ];
   if (g.mode === 'run') {
@@ -215,7 +226,13 @@ function handleEvents() {
   for (const e of s.events) {
     switch (e.type) {
       case 'start': game.started = true; break;
-      case 'schlag': ton(440 + e.left * 70, 0.07, 'sine', 0.14); vibe(8); break;
+      case 'schlag': ton(620, 0.07, 'sine', 0.14); vibe(8); break;
+      case 'wand':
+        ton(e.left > 0 ? 240 : 180, 0.09, 'square', 0.07);
+        vibe(25);
+        game.sparks.push({ x: e.x, y: e.y, t: 0 });
+        game.wallAnim = 1;
+        break;
       case 'bande': ton(260, 0.06, 'triangle', 0.12); break;
       case 'kante': ton(380, 0.05, 'triangle', 0.1); break;
       case 'rein': ton(660, 0.08, 'sine', 0.1); ton(880, 0.1, 'sine', 0.1, 0.07); break;
@@ -262,10 +279,12 @@ function dialog(title, rows, buttons) {
 }
 
 function refreshMenu() {
-  $('run-best').textContent = store.best.run != null
-    ? `Bestzeit: ${zeit(store.best.run)}`
+  const run = store.best[bestKey('run')];
+  $('run-best').textContent = run != null
+    ? `Bestzeit: ${zeit(run)} (Tempo ${store.settings.tempo} %)`
     : `${LEVELS.length} Level am Stück, auf Zeit`;
-  $('steuerung').textContent = `Steuerung: ${store.settings.steuerung === 'zeigen' ? 'Zeigen' : 'Schieben'}`;
+  $('steuerung').textContent = `Steuerung: ${STEUERUNGEN[store.settings.steuerung]}`;
+  $('tempo').textContent = `Tempo: ${store.settings.tempo} %`;
   $('ton').textContent = `Ton: ${store.settings.ton ? 'an' : 'aus'}`;
 }
 
@@ -278,7 +297,7 @@ function openPractice() {
     name.textContent = `${i + 1} · ${lv.name}`;
     const best = document.createElement('span');
     best.className = 'best';
-    const t = store.best.levels[lv.id];
+    const t = store.best[bestKey(lv.id)];
     best.textContent = t != null ? zeit(t) : '–';
     b.append(name, best);
     b.addEventListener('click', () => startLevel('uebung', i));
@@ -291,7 +310,13 @@ $('run-start').addEventListener('click', () => { unlockAudio(); startLevel('run'
 $('uebung-oeffnen').addEventListener('click', () => { unlockAudio(); openPractice(); });
 $('uebung-zurueck').addEventListener('click', () => showScreen('menue'));
 $('steuerung').addEventListener('click', () => {
-  store.settings.steuerung = store.settings.steuerung === 'zeigen' ? 'schieben' : 'zeigen';
+  const keys = Object.keys(STEUERUNGEN);
+  store.settings.steuerung = keys[(keys.indexOf(store.settings.steuerung) + 1) % keys.length];
+  save();
+  refreshMenu();
+});
+$('tempo').addEventListener('click', () => {
+  store.settings.tempo = TEMPI[(TEMPI.indexOf(store.settings.tempo) + 1) % TEMPI.length];
   save();
   refreshMenu();
 });
@@ -309,14 +334,17 @@ function updateHud() {
   if (!game) return;
   const g = game;
   const t = g.mode === 'run' ? g.runSteps : g.levelSteps;
-  const info = `${g.mode === 'run' ? `Level ${g.index + 1}/${LEVELS.length}` : 'Übung'} · ${g.level.name}`;
-  const key = `${t}|${info}|${g.tries}`;
+  const info = `${g.mode === 'run' ? `Level ${g.index + 1}/${LEVELS.length}` : 'Übung'} · ${g.level.name} · Versuch ${g.tries}`;
+  const wl = g.s.wallLeft;
+  const key = `${t}|${info}|${wl}`;
   if (key !== hudCache) {
     hudCache = key;
     $('zeit').textContent = zeit(t);
     $('level-info').textContent = info;
-    $('versuche').textContent = `Versuch ${g.tries}`;
+    $('wand-zahl').textContent = String(wl);
+    $('wand').classList.toggle('null', wl === 0);
   }
+  $('wand-zahl').style.transform = `scale(${1 + g.wallAnim * 0.35})`;
 
   const s = g.s;
   let title = '', text = '', cls = '';
@@ -332,6 +360,7 @@ function updateHud() {
     msgCache = mkey;
     const m = $('meldung');
     m.hidden = !title;
+    m.style.bottom = controlHeight() ? `${controlHeight() + 16}px` : '';
     m.className = cls;
     $('meldung-titel').textContent = title;
     $('meldung-text').textContent = text;
@@ -342,11 +371,21 @@ function updateHud() {
 
 const cam = { x: 0, y: 0, z: 1 };
 
+/** Höhe des Bereichs für den Steuerkreis am unteren Rand (0, wenn er nicht benutzt wird). */
+function controlHeight() {
+  if (!game || store.settings.steuerung !== 'kreis') return 0;
+  return DIAL_R * 2 + 40 + $('safe-unten').offsetHeight;
+}
+
+function dialCenter() {
+  return { x: innerWidth / 2, y: innerHeight - controlHeight() / 2 - $('safe-unten').offsetHeight / 2 };
+}
+
 function viewRect() {
   const top = hud.hidden ? 16 : hud.offsetHeight + 8;
   // Solange unten eine Meldung steht, rückt das Spielfeld nach oben
   const m = $('meldung');
-  const bottom = m.hidden ? 24 : m.offsetHeight + 72;
+  const bottom = controlHeight() + (m.hidden ? 24 : m.offsetHeight + (controlHeight() ? 40 : 72));
   return { x: 0, y: top, w: innerWidth, h: Math.max(100, innerHeight - top - bottom) };
 }
 
@@ -395,6 +434,15 @@ function toScreen(x, y) {
 
 let pointerId = null;
 let lastPt = null;
+let dialActive = false;
+
+/** Steuerkreis: Richtung des Fingers vom Kreismittelpunkt = Position des Schlägers auf dem Ring. */
+function aimDial(e) {
+  const c = dialCenter();
+  const dx = e.clientX - c.x, dy = e.clientY - c.y;
+  if (Math.hypot(dx, dy) < 10) return;
+  aimPaddle(game.s, Math.atan2(dy, dx));
+}
 
 function aimAt(e) {
   const s = game.s;
@@ -410,13 +458,19 @@ canvas.addEventListener('pointerdown', e => {
   lastPt = { x: e.clientX, y: e.clientY };
   try { canvas.setPointerCapture(e.pointerId); } catch { /* ignorieren */ }
   if (game.s.phase === 'ready') launch(game.s);
-  if (store.settings.steuerung === 'zeigen') aimAt(e);
+  const st = store.settings.steuerung;
+  if (st === 'zeigen') aimAt(e);
+  dialActive = st === 'kreis' && e.clientY >= innerHeight - controlHeight();
+  if (dialActive) aimDial(e);
 });
 
 canvas.addEventListener('pointermove', e => {
   if (!game || e.pointerId !== pointerId || game.paused) return;
   const s = game.s;
-  if (store.settings.steuerung === 'zeigen') {
+  const st = store.settings.steuerung;
+  if (st === 'kreis') {
+    if (dialActive) aimDial(e);
+  } else if (st === 'zeigen') {
     aimAt(e);
   } else {
     // Schieben: Fingerbewegung entlang der Schiene projizieren
@@ -429,7 +483,12 @@ canvas.addEventListener('pointermove', e => {
   lastPt = { x: e.clientX, y: e.clientY };
 });
 
-const endPointer = e => { if (e.pointerId === pointerId) pointerId = null; };
+const endPointer = e => {
+  if (e.pointerId === pointerId) {
+    pointerId = null;
+    dialActive = false;
+  }
+};
 canvas.addEventListener('pointerup', endPointer);
 canvas.addEventListener('pointercancel', endPointer);
 
@@ -482,7 +541,12 @@ function draw() {
   drawRings(s);
   drawPaddle(s);
   if (game) {
+    drawSparks();
     drawBall(s);
+    if (controlHeight()) {
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      drawDial(s);
+    }
     if (game.flash > 0) {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.fillStyle = `rgba(255, 77, 106, ${game.flash * 0.18})`;
@@ -535,18 +599,6 @@ function drawRings(s) {
     ctx.shadowBlur = 0;
   });
 
-  // Verbleibende Berührungen des aktiven Rings als Punkte in der Mitte
-  if (!game) return;
-  const ring = s.rings[s.active];
-  if (ring.goal) return;
-  const n = ring.maxTouches;
-  const gap = 14;
-  for (let k = 0; k < n; k++) {
-    ctx.fillStyle = k < ring.touches ? COL.punkt : COL.punktLeer;
-    ctx.beginPath();
-    ctx.arc(ring.x + (k - (n - 1) / 2) * gap, ring.y + 34, 3.5, 0, TAU);
-    ctx.fill();
-  }
 }
 
 function drawPaddle(s) {
@@ -554,15 +606,66 @@ function drawPaddle(s) {
   if (ring.goal) return;
   const pr = paddleRadius(ring);
   const ph = paddleHalf(ring);
-  const voll = ring.touches > 0;
-  ctx.strokeStyle = voll ? COL.schlaeger : COL.schlaegerLeer;
+  ctx.strokeStyle = COL.schlaeger;
   ctx.lineWidth = PADDLE_T;
   ctx.lineCap = 'round';
-  if (voll) { ctx.shadowColor = COL.schlaeger; ctx.shadowBlur = 14; }
+  ctx.shadowColor = COL.schlaeger;
+  ctx.shadowBlur = 14;
   ctx.beginPath();
   ctx.arc(ring.x, ring.y, pr, s.paddle - ph, s.paddle + ph);
   ctx.stroke();
   ctx.shadowBlur = 0;
+}
+
+function drawSparks() {
+  for (const sp of game.sparks) {
+    const k = sp.t / 0.45;
+    ctx.strokeStyle = `${COL.funke} ${1 - k})`;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(sp.x, sp.y, 6 + k * 26, 0, TAU);
+    ctx.stroke();
+  }
+}
+
+/** Steuerkreis unten: Miniatur des aktiven Rings mit Öffnung, Schläger und Fingerziel. */
+function drawDial(s) {
+  const c = dialCenter();
+  const ring = s.rings[s.active];
+  ctx.fillStyle = 'rgba(16, 23, 40, 0.75)';
+  ctx.beginPath();
+  ctx.arc(c.x, c.y, DIAL_R + 14, 0, TAU);
+  ctx.fill();
+  ctx.lineCap = 'round';
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = COL.kreis;
+  ctx.beginPath();
+  ctx.arc(c.x, c.y, DIAL_R, ring.gap + ring.half, ring.gap - ring.half + TAU);
+  ctx.stroke();
+  if (!ring.goal) {
+    ctx.strokeStyle = COL.oeffnung;
+    ctx.setLineDash([3, 5]);
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, DIAL_R, ring.gap - ring.half, ring.gap + ring.half);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    const ph = paddleHalf(ring);
+    ctx.strokeStyle = COL.schlaeger;
+    ctx.lineWidth = 8;
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, DIAL_R - 10, s.paddle - ph, s.paddle + ph);
+    ctx.stroke();
+    if (dialActive) {
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+      ctx.beginPath();
+      ctx.arc(c.x + Math.cos(s.paddleTarget) * DIAL_R, c.y + Math.sin(s.paddleTarget) * DIAL_R, 7, 0, TAU);
+      ctx.fill();
+    }
+  }
+  ctx.fillStyle = 'rgba(220, 228, 255, 0.25)';
+  ctx.beginPath();
+  ctx.arc(c.x, c.y, 3, 0, TAU);
+  ctx.fill();
 }
 
 function drawBall(s) {
@@ -639,6 +742,9 @@ function frame(now) {
       game.trail = [];
     }
     game.flash = Math.max(0, game.flash - dt * 3);
+    game.wallAnim = Math.max(0, game.wallAnim - dt * 4);
+    for (const sp of game.sparks) sp.t += dt;
+    game.sparks = game.sparks.filter(sp => sp.t < 0.45);
 
     if (game.winT >= 0) {
       game.winT += dt;
