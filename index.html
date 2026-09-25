@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#070B14">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Orbits">
+<title>Orbits</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<canvas id="spiel"></canvas>
+
+<div id="hud" hidden>
+  <button id="pause" class="rund" aria-label="Pause">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
+  </button>
+  <div class="hud-mitte">
+    <div id="zeit">0:00,00</div>
+    <div id="level-info"></div>
+  </div>
+  <div id="versuche"></div>
+</div>
+
+<div id="meldung" hidden>
+  <div id="meldung-titel"></div>
+  <div id="meldung-text"></div>
+</div>
+
+<section id="menue" class="bildschirm">
+  <div class="karte">
+    <h1>Orbits</h1>
+    <p class="unterzeile">Prototyp v0.1</p>
+    <button id="run-start" class="haupt">Run starten</button>
+    <p id="run-best" class="klein"></p>
+    <button id="uebung-oeffnen">Level üben</button>
+    <div class="einstellungen">
+      <button id="steuerung" class="schalter"></button>
+      <button id="ton" class="schalter"></button>
+    </div>
+    <p class="klein anleitung">Schieb den Schläger entlang des Rings, fang den Ball und schick ihn durch die Öffnung in den nächsten Ring. Jeder Ring erlaubt nur wenige Berührungen. Die Uhr läuft, bis du im goldenen Ring bist.</p>
+  </div>
+</section>
+
+<section id="uebung" class="bildschirm" hidden>
+  <div class="karte">
+    <h2>Level üben</h2>
+    <div id="level-liste"></div>
+    <button id="uebung-zurueck">Zurück</button>
+  </div>
+</section>
+
+<section id="dialog" class="bildschirm" hidden>
+  <div class="karte">
+    <h2 id="dialog-titel"></h2>
+    <dl id="dialog-werte"></dl>
+    <div id="dialog-knoepfe"></div>
+  </div>
+</section>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
