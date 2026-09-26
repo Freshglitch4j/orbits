@@ -104,6 +104,7 @@ button.rund svg { width: 18px; height: 18px; fill: currentColor; }
 #meldung-titel { font-size: 22px; font-weight: 600; }
 #meldung-text { font-size: 14px; color: var(--text-2); margin-top: 6px; max-width: 340px; margin-inline: auto; }
 #meldung.fehler #meldung-titel { color: var(--rot); }
+#meldung.tor #meldung-titel { color: var(--gold); font-size: 28px; }
 
 /* Menüs und Dialoge */
 .bildschirm {
@@ -153,11 +154,7 @@ h2 { margin: 0 0 16px; font-size: 22px; }
   font-weight: 600;
 }
 .karte button:active { transform: scale(0.98); }
-.einstellungen { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
-.einstellungen .breit { grid-column: 1 / -1; }
-.einstellungen button.schalter { margin: 0; font-size: 14px; }
-
-#level-liste button {
+#level-liste button, #optionen-liste button {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -165,10 +162,13 @@ h2 { margin: 0 0 16px; font-size: 22px; }
   text-align: left;
 }
 #level-liste .best { color: var(--text-2); font-size: 14px; font-variant-numeric: tabular-nums; }
+#optionen-liste button { font-size: 15px; }
+#optionen-liste .wert { color: var(--akzent); font-weight: 600; }
+#optionen-liste .info { text-align: left; margin: -2px 4px 10px; }
 
 #dialog-werte {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: auto 1fr;
   gap: 8px 16px;
   margin: 0 0 16px;
   text-align: left;

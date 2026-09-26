@@ -40,15 +40,13 @@
 <section id="menue" class="bildschirm">
   <div class="karte">
     <h1>Orbits</h1>
-    <p class="unterzeile">Prototyp v0.2</p>
+    <p class="unterzeile">Prototyp v0.3</p>
     <button id="run-start" class="haupt">Run starten</button>
     <p id="run-best" class="klein"></p>
     <button id="uebung-oeffnen">Level üben</button>
-    <div class="einstellungen">
-      <button id="steuerung" class="schalter breit"></button>
-      <button id="tempo" class="schalter"></button>
-      <button id="ton" class="schalter"></button>
-    </div>
+    <button id="training-start">Training</button>
+    <button id="einstellungen-oeffnen">Einstellungen</button>
+    <p id="einstellungen-kurz" class="klein"></p>
     <p class="klein anleitung">Schieb den Schläger entlang des Rings, fang den Ball und schick ihn durch die Öffnung in den nächsten Ring. Der Schläger darf beliebig oft, die Innenwände nur begrenzt: Der Zähler oben rechts zeigt, wie viele Wandberührungen noch übrig sind. Die Uhr läuft, bis du im goldenen Ring bist.</p>
   </div>
 </section>
@@ -58,6 +56,16 @@
     <h2>Level üben</h2>
     <div id="level-liste"></div>
     <button id="uebung-zurueck">Zurück</button>
+  </div>
+</section>
+
+<section id="einstellungen" class="bildschirm" hidden>
+  <div class="karte">
+    <h2>Einstellungen</h2>
+    <p class="klein">Zum Testen. Bestzeiten werden je Einstellung getrennt gespeichert.</p>
+    <div id="optionen-liste"></div>
+    <button id="einstellungen-standard">Standard wiederherstellen</button>
+    <button id="einstellungen-zurueck" class="haupt">Fertig</button>
   </div>
 </section>
 

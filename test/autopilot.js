@@ -1,7 +1,7 @@
 /* Autopilot für Tests: fängt jeden Ball und zielt auf die Öffnung des nächsten Rings.
    Beweist, dass jedes Level lösbar ist, und prüft die Physik auf Determinismus. */
 
-import { step, launch, aimPaddle, paddleRadius, paddleHalf, BALL_R, PADDLE_T, MAX_DEFLECT, angDiff, DT } from '../js/sim.js';
+import { step, launch, aimPaddle, paddleRadius, paddleHalf, bounceOut, BALL_R, PADDLE_T, angDiff, DT } from '../js/sim.js';
 
 function landing(s) {
   const ring = s.rings[s.active];
@@ -45,15 +45,24 @@ export function autopilotStep(s, aimOffset = 0) {
       const hitAng = Math.atan2(L.y - ring.y, L.x - ring.x);
       const tx = next.x + Math.cos(next.gap) * next.r - Math.sin(next.gap) * aimOffset;
       const ty = next.y + Math.sin(next.gap) * next.r + Math.cos(next.gap) * aimOffset;
-      let want = Math.atan2(ty - L.y, tx - L.x);
-      if (!clearsGap(ring, L, want)) {
-        // Direkter Weg verbaut: erst auf die Seite gegenüber der Öffnung spielen
-        const R = paddleRadius(ring);
-        const px = ring.x - Math.cos(ring.gap) * R, py = ring.y - Math.sin(ring.gap) * R;
-        want = Math.atan2(py - L.y, px - L.x);
+      const want = Math.atan2(ty - L.y, tx - L.x);
+      // Gegenüberliegende Seite der Öffnung: von dort führt der Weg hinaus meist gerade durch
+      const R = paddleRadius(ring);
+      const px = ring.x - Math.cos(ring.gap) * R, py = ring.y - Math.sin(ring.gap) * R;
+      const setup = Math.atan2(py - L.y, px - L.x);
+      // Alle Trefferstellen durchprobieren: am liebsten direkt aufs Ziel, sonst Vorbereitung
+      let k = 0, best = Infinity;
+      for (let i = -20; i <= 20; i++) {
+        const kk = i / 20;
+        const out = bounceOut(s.bounce, hitAng + Math.PI, s.ball.vx, s.ball.vy, kk);
+        const err = Math.abs(angDiff(out, want));
+        // Hinaus nur, wenn der Schuss auch aufs Ziel geht; sonst drinnen bleiben und vorbereiten
+        const cost = clearsGap(ring, L, out)
+          ? (err < 0.08 ? err : 100 + err)
+          : 10 + Math.abs(angDiff(out, setup));
+        if (cost < best) { best = cost; k = kk; }
       }
-      const k = Math.max(-1, Math.min(1, angDiff(hitAng + Math.PI, want) / MAX_DEFLECT));
-      aimPaddle(s, hitAng - k * paddleHalf(ring));
+      aimPaddle(s, hitAng - k * paddleHalf(ring, s.paddleLen));
     }
   }
   step(s);

@@ -1,6 +1,6 @@
 /* Service Worker – macht das Spiel offline spielbar.
    Bei jeder neuen Version CACHE hochzählen. */
-const CACHE = 'orbits-0.2.0';
+const CACHE = 'orbits-0.3.0';
 const FILES = ['./', './index.html', './app.css', './js/main.js', './js/sim.js', './js/levels.js',
   './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png',
   './icons/icon-maskable-512.png', './icons/icon-180.png'];

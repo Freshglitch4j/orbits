@@ -6,7 +6,7 @@ den nächsten Ring zu bringen, mit wenigen Berührungen und möglichst schnell.
 
 Das vollständige Spielkonzept steht in [`KONZEPT.md`](KONZEPT.md).
 
-## Stand: Prototyp v0.2
+## Stand: Prototyp v0.3
 
 - 3 Level, spielbar als **Run** (am Stück, Gesamtzeit) oder einzeln in der **Übung**
 - Schläger auf der Kreisschiene, Ball mit deterministischer Physik
@@ -14,13 +14,15 @@ Das vollständige Spielkonzept steht in [`KONZEPT.md`](KONZEPT.md).
 - Steuerung **Steuerkreis** (Kreis unten, der Daumen verdeckt das Spielfeld nicht),
   **Schieben** (Finger irgendwo bewegen, der Schläger folgt entlang der Schiene)
   oder **Zeigen** (Schläger fährt in Richtung des Fingers)
-- Einstellung **Tempo** (50–120 %) zum Testen
+- **Training**: großer Ring, unbegrenzte Wandtreffer, kleines Tor, Statistik
+- **Einstellungen** zum Testen: Tempo, Abprall (Mischung/Pong/Physik), Ablenkung, Richtung, Schlägerlänge, Torgröße
 - Installierbar und offline spielbar
 
 ## Spielregeln
 
 - Tippen startet den Ball.
-- Der Schläger darf beliebig oft berührt werden.
+- Der Schläger darf beliebig oft berührt werden. Standard-Abprall: Einfallswinkel = Ausfallswinkel,
+  dazu lenkt die Trefferstelle nach (Rand = bis 25° zusätzlich).
 - Die **Innenwände** prallen ab, aber nur begrenzt oft pro Level (Zähler oben rechts).
   Steht er auf 0, ist der Ball bei der nächsten Innenwand-Berührung verloren.
 - Die **Außenwand** eines Rings wirkt als Bande und kostet nichts.

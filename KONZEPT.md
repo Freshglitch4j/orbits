@@ -100,18 +100,24 @@ Gewünschte Gänsehaut-Momente (alle drei bestätigt):
 - Speicherung: Fortschritt, Upgrades, Bestzeiten in localStorage/IndexedDB.
 - Optional später: Ghost-Replay der Bestzeit (Eingaben aufzeichnen – funktioniert nur bei deterministischer Physik).
 
-## 11. Stand der Umsetzung: Prototyp v0.2
+## 11. Stand der Umsetzung: Prototyp v0.3
 
 Umgesetzt: PWA-Grundgerüst, 3 Level (Erste Bahn, Versatz, Umkehr), Run-Modus mit Gesamtzeit, Übungsmodus, Bestzeiten, drei Steuerungsarten (Steuerkreis, Schieben, Zeigen), Tempo-Einstellung zum Testen, Klang, Tests mit Autopilot. Aufbau siehe `README.md`.
 
-**Nach dem ersten Handytest (Galaxy A55) geändert:**
+**v0.3 – Abprall und Training:**
+- Abprall ist jetzt einstellbar. **Standard: Mischung** – erst Spiegelung (Einfallswinkel = Ausfallswinkel), dann lenkt die Trefferstelle nach (Standard 25° am Rand, höchstens 80° zur Senkrechten). Alternativen zum Vergleich: **Pong** (nur Trefferstelle) und **Physik** (nur Spiegelung – da der Schläger ein Stück des Rings ist, kann man damit nicht zielen; deshalb braucht es das Nachlenken).
+- **Richtung der Ablenkung umkehrbar** (Treffer rechts lenkt nach links). Idee für ein späteres **Reverse-Level**: Leveldaten können den Abprall mit `bounce: { reverse: true }` festlegen.
+- **Trainingsmodus**: ein großer Ring, unbegrenzte Wandtreffer, ein kleines Tor, das nach jedem Treffer weiterwandert. Statistik (Tore, Schläge/Wandtreffer/Zeit pro Tor) und Einstellungen über die Pause, Änderungen gelten sofort.
+- **Einstellungsbildschirm** mit Steuerung, Tempo, Abprall, Ablenkung, Richtung, Schlägerlänge, Torgröße, Ton. Bestzeiten werden je Kombination aus Tempo, Abprall und Schläger getrennt gespeichert.
+
+**Nach dem ersten Handytest (Galaxy A55) geändert (v0.2):**
 - Ball war zu schnell → Einstellung **Tempo** (50–120 %, Standard 70 %). Bestzeiten werden je Tempo getrennt gespeichert.
 - Finger verdeckten das Spielfeld → **Steuerkreis** (Standard): ein Kreis unten, außerhalb des Spielfelds. Die Richtung des Daumens vom Kreismittelpunkt ist die Position des Schlägers auf dem Ring. Der Kreis zeigt den aktiven Ring als Miniatur mit Öffnung und Schläger.
 - **Neue Berührungsregel (ersetzt das Limit pro Ring):** Der Schläger darf beliebig oft berührt werden. Begrenzt sind die **Berührungen der Innenwände**, als Zähler für das ganze Level (Level 1: 10, Level 2: 8, Level 3: 6). Die Innenwand prallt ab und zählt herunter; bei 0 ist der Ball bei der nächsten Innenwand-Berührung verloren. Punkte = übrige Wandberührungen × 100.
 
 **Vorläufige Regeln im Prototyp** (zum Testen gedacht, jederzeit änderbar):
 - **Innenwand** prallt ab und kostet eine Wandberührung (siehe oben), **Außenwand = Bande** ohne Kosten. Die Kanten der Öffnung prallen immer ab.
-- **Abprall wie bei Pong/Arkanoid:** Die Trefferstelle auf dem Schläger bestimmt den Winkel (Mitte = gerade zurück, Rand = bis ca. 57°), der Einfallswinkel zählt nicht.
+- **Abprall:** siehe v0.3 oben (Mischung als Standard).
 - **Eine Öffnung pro Ring**, durch die der Ball hinein und hinaus muss. Übergang: exakt durch die Öffnung (keine Einfangzone).
 - Betritt der Ball einen neuen Ring, springt der Schläger dorthin, gegenüber der Öffnung.
 - Schlägergeschwindigkeit begrenzt (10 rad/s), auch im Zeigen-Modus.
@@ -132,6 +138,8 @@ Umgesetzt: PWA-Grundgerüst, 3 Level (Erste Bahn, Versatz, Umkehr), Run-Modus mi
 8. ~~Innenwand tödlich oder Bande?~~ Entschieden: Bande mit begrenztem Zähler pro Level. Steuerung: Steuerkreis als Standard, weiter testen.
 9. Soll der Wandzähler pro Level bleiben oder pro Ring gelten? Wie belohnt man Skips, wenn Punkte aus übrigen Wandberührungen kommen?
 10. Welches Tempo wird der Standard, wenn die Testphase vorbei ist?
+11. Beste Abprall-Einstellung (Modus, Ablenkung, Schlägerlänge) – im Trainingsmodus ermitteln.
+12. Reverse-Level: umgekehrte Ablenkung als eigenes Level oder als Upgrade/Build-Element?
 
 ## 13. Nächste Schritte
 

@@ -5,6 +5,8 @@
    Koordinaten: x nach rechts, y nach unten.
    Winkel im Bogenmaß: 0 = rechts, π/2 = unten, -π/2 = oben (Leveldaten in Grad). */
 
+const rad = deg => deg * Math.PI / 180;
+
 export const DT = 1 / 240;
 export const TAU = Math.PI * 2;
 
@@ -12,15 +14,21 @@ export const BALL_R = 9;
 export const WALL = 8;             // Wandstärke der Ringe
 export const PADDLE_INSET = 14;    // Schlägermitte liegt so weit innerhalb der Wandmitte
 export const PADDLE_T = 8;         // Schlägerdicke
-export const PADDLE_LEN = 92;      // Bogenlänge des Schlägers
+export const PADDLE_LEN = 92;      // Bogenlänge des Schlägers (Standard)
 export const PADDLE_SPEED = 10;    // höchste Schlägergeschwindigkeit in rad/s
-export const MAX_DEFLECT = 1.0;    // Ablenkung am Schlägerrand in rad (≈ 57°)
+export const MAX_OUT = rad(80);    // der Ball verlässt den Schläger höchstens so schräg zur Senkrechten
+
+/* Abprall am Schläger:
+   pong    – nur die Trefferstelle zählt (Mitte = gerade zurück), der Einfallswinkel nicht
+   mix     – erst spiegeln (Einfall = Ausfall), dann je nach Trefferstelle nachlenken
+   physik  – nur spiegeln; da der Schläger ein Stück des Rings ist, kann man damit nicht zielen
+   deflect: Ablenkung am Schlägerrand in Grad; reverse: Ablenkung in die Gegenrichtung */
+export const DEFAULT_BOUNCE = { mode: 'mix', deflect: 25, reverse: false };
 const PADDLE_LEAD = 0.8;           // so weit darf das Schieben dem Schläger vorauslaufen
 const FAIL_PAUSE = 0.7;            // Sekunden zwischen Fehler und Neustart
 const OUT_MARGIN = 260;            // Abstand zu den Ringen, ab dem der Ball verloren ist
 const LOST_TIME = 8;               // Sekunden außerhalb aller Ringe, bis der Ball als verirrt gilt
 
-const rad = deg => deg * Math.PI / 180;
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
 /** Kürzeste Winkeldifferenz a − b im Bereich (−π, π]. */
@@ -32,10 +40,26 @@ export function angDiff(a, b) {
 }
 
 export const paddleRadius = ring => ring.r - PADDLE_INSET;
-export const paddleHalf = ring => PADDLE_LEN / 2 / paddleRadius(ring);
+export const paddleHalf = (ring, len = PADDLE_LEN) => len / 2 / paddleRadius(ring);
 
-/** speedFactor verändert das Balltempo (Testeinstellung), 1 = Tempo aus den Leveldaten. */
-export function createState(level, { speedFactor = 1 } = {}) {
+/** Grundrichtung vor dem Nachlenken: pong = zur Ringmitte, sonst die Spiegelung von v an der Senkrechten. */
+export function bounceBase(mode, inward, vx, vy) {
+  if (mode === 'pong') return inward;
+  const nx = Math.cos(inward), ny = Math.sin(inward);
+  const vn = vx * nx + vy * ny;
+  return Math.atan2(vy - 2 * vn * ny, vx - 2 * vn * nx);
+}
+
+/** Ausfallsrichtung für die Trefferstelle k (−1 … 1 über die Schlägerlänge). */
+export function bounceOut(bounce, inward, vx, vy, k) {
+  let out = bounceBase(bounce.mode, inward, vx, vy);
+  if (bounce.mode !== 'physik') out -= k * rad(bounce.deflect) * (bounce.reverse ? -1 : 1);
+  return inward + clamp(angDiff(out, inward), -MAX_OUT, MAX_OUT);
+}
+
+/** Optionen (Testeinstellungen): speedFactor für das Balltempo, bounce für den Abprall, paddleLen.
+    Ein Level kann mit level.bounce Teile des Abpralls festlegen (z. B. reverse). */
+export function createState(level, { speedFactor = 1, bounce = DEFAULT_BOUNCE, paddleLen = PADDLE_LEN } = {}) {
   const rings = level.rings.map(r => ({
     x: r.x, y: r.y, r: r.r,
     gap: rad(r.gap),
@@ -51,6 +75,8 @@ export function createState(level, { speedFactor = 1 } = {}) {
   const s = {
     level, rings, bounds,
     speed: level.speed * speedFactor,
+    bounce: { ...bounce, ...level.bounce },
+    paddleLen,
     maxWallHits: level.wallHits,
     wallLeft: level.wallHits,   // erlaubte Berührungen der Innenwände, für das ganze Level
     ball: { x: 0, y: 0, vx: 0, vy: 0 },
@@ -196,11 +222,10 @@ function collideRing(s, i, px, py) {
       const vr = (b.vx * dx + b.vy * dy) / d;
       if (d + BALL_R >= inner && vr > 0) {
         const off = angDiff(ang, s.paddle);
-        const ph = paddleHalf(ring);
+        const ph = paddleHalf(ring, s.paddleLen);
         if (Math.abs(off) <= ph + BALL_R / pr) {
-          // Wie bei Pong bestimmt die Trefferstelle den Abprallwinkel, nicht der Einfallswinkel
           const k = clamp(off / ph, -1, 1);
-          const out = Math.atan2(-dy, -dx) - k * MAX_DEFLECT;
+          const out = bounceOut(s.bounce, Math.atan2(-dy, -dx), b.vx, b.vy, k);
           const sp = Math.hypot(b.vx, b.vy);
           b.vx = Math.cos(out) * sp;
           b.vy = Math.sin(out) * sp;
@@ -212,6 +237,7 @@ function collideRing(s, i, px, py) {
         }
       }
     }
+    if (d >= ring.r && inGap) s.events.push({ type: 'raus', ring: i });
     // Innenwand: prallt ab und kostet eine Wandberührung; sind keine mehr übrig, ist der Ball verloren
     if (d + BALL_R >= ring.r - WALL / 2 && !inGap) {
       if (s.wallLeft <= 0) {

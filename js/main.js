@@ -28,9 +28,37 @@ const FEHLER = {
 };
 
 const SCHIEBE_GAIN = 1.3;   // Empfindlichkeit beim Schieben
-const TEMPI = [50, 60, 70, 80, 90, 100, 110, 120];   // Balltempo in Prozent (Testeinstellung)
-const STEUERUNGEN = { kreis: 'Steuerkreis', schieben: 'Schieben', zeigen: 'Zeigen' };
 const DIAL_R = 62;          // Radius des Steuerkreises in Pixeln
+const GOLDEN = 137.508;     // Training: so weit wandert das Tor nach jedem Treffer (Grad)
+
+/* Einstellungen: Reihenfolge und Werte für den Einstellungsbildschirm */
+const OPTIONEN = [
+  { key: 'steuerung', label: 'Steuerung', values: ['kreis', 'schieben', 'zeigen'],
+    text: v => ({ kreis: 'Steuerkreis', schieben: 'Schieben', zeigen: 'Zeigen' })[v] },
+  { key: 'tempo', label: 'Tempo', values: [50, 60, 70, 80, 90, 100, 110, 120], text: v => `${v} %` },
+  { key: 'abprall', label: 'Abprall', values: ['mix', 'pong', 'physik'],
+    text: v => ({ mix: 'Mischung', pong: 'Pong', physik: 'Physik' })[v],
+    info: v => ({
+      mix: 'Einfallswinkel = Ausfallswinkel, dazu lenkt die Trefferstelle nach.',
+      pong: 'Nur die Trefferstelle zählt: Mitte = gerade zurück, Rand = schräg.',
+      physik: 'Nur Spiegelung. Zielen ist damit kaum möglich.',
+    })[v] },
+  { key: 'ablenkung', label: 'Ablenkung am Rand', values: [0, 10, 15, 20, 25, 30, 40, 50, 60], text: v => `${v}°` },
+  { key: 'richtung', label: 'Richtung der Ablenkung', values: ['normal', 'umgekehrt'],
+    text: v => v === 'normal' ? 'normal' : 'umgekehrt',
+    info: v => v === 'normal'
+      ? 'Treffer am rechten Rand lenkt nach rechts.'
+      : 'Treffer am rechten Rand lenkt nach links.' },
+  { key: 'schlaeger', label: 'Schläger', values: [60, 76, 92, 110, 130],
+    text: v => ({ 60: 'sehr kurz', 76: 'kurz', 92: 'normal', 110: 'lang', 130: 'sehr lang' })[v] },
+  { key: 'tor', label: 'Tor im Training', values: [8, 12, 18, 26],
+    text: v => ({ 8: 'sehr klein', 12: 'klein', 18: 'mittel', 26: 'groß' })[v] },
+  { key: 'ton', label: 'Ton & Vibration', values: [true, false], text: v => v ? 'an' : 'aus' },
+];
+const STANDARD = {
+  steuerung: 'kreis', tempo: 70, abprall: 'mix', ablenkung: 25, richtung: 'normal',
+  schlaeger: 92, tor: 12, ton: true,
+};
 
 const $ = id => document.getElementById(id);
 const canvas = $('spiel');
@@ -40,8 +68,8 @@ const hud = $('hud');
 /* ---------- Speicher ---------- */
 
 const KEY = 'orbits.v1';
-// best: Zeitschritte je Level-ID bzw. 'run', bei anderem Tempo als 100 % mit „@Tempo“ dahinter
-const store = { version: 2, settings: { steuerung: 'kreis', ton: true, tempo: 70 }, best: {} };
+// best: Zeitschritte je Level-ID bzw. 'run' und Einstellungen, die das Spiel verändern (siehe bestKey)
+const store = { version: 2, settings: { ...STANDARD }, best: {} };
 try {
   const d = JSON.parse(localStorage.getItem(KEY) || '{}');
   if (d.version === 2) {
@@ -55,7 +83,28 @@ try {
   }
 } catch { /* ohne Speicher spielbar */ }
 
-const bestKey = id => store.settings.tempo === 100 ? id : `${id}@${store.settings.tempo}`;
+/** Bestzeiten gelten nur für dieselben Einstellungen von Tempo, Abprall und Schläger. */
+function bestKey(id) {
+  const st = store.settings;
+  return `${id}@${st.tempo}|${st.abprall}${st.ablenkung}${st.richtung === 'umgekehrt' ? 'u' : ''}|${st.schlaeger}`;
+}
+
+function stateOptions() {
+  const st = store.settings;
+  return {
+    speedFactor: st.tempo / 100,
+    bounce: { mode: st.abprall, deflect: st.ablenkung, reverse: st.richtung === 'umgekehrt' },
+    paddleLen: st.schlaeger,
+  };
+}
+
+/** Kurzbeschreibung der spielrelevanten Einstellungen */
+function settingsSummary() {
+  const st = store.settings;
+  const text = key => OPTIONEN.find(o => o.key === key).text(st[key]);
+  return `Tempo ${st.tempo} % · ${text('abprall')}${st.abprall === 'physik' ? '' : ` ${st.ablenkung}°`}` +
+    `${st.richtung === 'umgekehrt' ? ' umgekehrt' : ''} · Schläger ${text('schlaeger')}`;
+}
 
 function save() {
   try { localStorage.setItem(KEY, JSON.stringify(store)); } catch { /* ignorieren */ }
@@ -101,11 +150,33 @@ function vibe(ms) {
 let game = null;
 const demo = createState(LEVELS[0]);   // Hintergrund im Menü
 
+function trainingLevel() {
+  return {
+    id: 'training',
+    name: 'Training',
+    hint: 'Schieß den Ball durchs Tor. Wandberührungen sind unbegrenzt. Die Einstellungen erreichst du über die Pause.',
+    speed: 330,
+    wallHits: Infinity,
+    rings: [{ x: 0, y: 0, r: 230, gap: -90, gapWidth: store.settings.tor }],
+    start: { ring: 0, dir: 90, paddle: 90 },
+  };
+}
+
+function startTraining() {
+  startLevel('training', -1);
+}
+
 function startLevel(mode, index, runSteps = 0, results = []) {
-  const level = LEVELS[index];
+  const level = mode === 'training' ? trainingLevel() : LEVELS[index];
   game = {
     mode, index, level, results, runSteps,
-    s: createState(level, { speedFactor: store.settings.tempo / 100 }),
+    s: createState(level, stateOptions()),
+    tore: 0,
+    schlaege: 0,
+    waende: 0,
+    torSchlaege: 0,     // Schläge seit dem letzten Tor
+    torMsgT: 0,
+    relaunchT: -1,
     levelSteps: 0,
     started: false,
     paused: false,
@@ -136,6 +207,27 @@ function pause() {
   if (!game || game.paused || game.winT >= 0) return;
   game.paused = true;
   pointerId = null;
+  showPauseDialog();
+}
+
+function showPauseDialog() {
+  if (game.mode === 'training') {
+    const g = game;
+    const pro = v => g.tore ? (v / g.tore).toLocaleString('de-AT', { maximumFractionDigits: 1 }) : '–';
+    dialog('Training', [
+      ['Tore', String(g.tore)],
+      ['Schläge pro Tor', pro(g.schlaege)],
+      ['Wandtreffer pro Tor', pro(g.waende)],
+      ['Zeit pro Tor', g.tore ? zeit(Math.round(g.levelSteps / g.tore)) : '–'],
+      ['Einstellungen', settingsSummary()],
+    ], [
+      ['Weiter', resume, true],
+      ['Einstellungen', () => openSettings(true)],
+      ['Statistik zurücksetzen', startTraining],
+      ['Zum Menü', toMenu],
+    ]);
+    return;
+  }
   const rows = [['Levelzeit', zeit(game.levelSteps)]];
   if (game.mode === 'run') rows.push(['Gesamtzeit', zeit(game.runSteps)]);
   dialog('Pause', rows, [
@@ -145,13 +237,48 @@ function pause() {
   ]);
 }
 
+/** Training: geänderte Einstellungen sofort übernehmen, ohne die Statistik zu verlieren. */
+function applySettingsLive() {
+  const s = game.s;
+  const o = stateOptions();
+  s.bounce = { ...o.bounce };
+  s.paddleLen = o.paddleLen;
+  const speed = s.level.speed * o.speedFactor;
+  const v = Math.hypot(s.ball.vx, s.ball.vy);
+  if (v > 0) { s.ball.vx *= speed / v; s.ball.vy *= speed / v; }
+  s.speed = speed;
+  s.rings[0].half = store.settings.tor * Math.PI / 360;
+}
+
+/** Training: Tor getroffen – Statistik, neues Tor, Ball zurück in die Mitte. */
+function goal() {
+  const g = game;
+  const s = g.s;
+  const ring = s.rings[0];
+  g.tore++;
+  g.lastTorSchlaege = g.torSchlaege;
+  g.torSchlaege = 0;
+  g.torMsgT = 1.2;
+  ton(784, 0.1, 'sine', 0.14);
+  ton(1047, 0.18, 'sine', 0.14, 0.08);
+  vibe(20);
+  ring.gap += GOLDEN * Math.PI / 180;
+  // Abschuss zur Gegenseite des neuen Tors, leicht versetzt – deterministisch
+  const off = ((g.tore * 53) % 70) - 35;
+  s.level.start.dir = ring.gap * 180 / Math.PI + 180 + off;
+  s.ball = { x: ring.x, y: ring.y, vx: 0, vy: 0 };
+  s.phase = 'ready';
+  g.trail = [];
+  g.relaunchT = 0.6;
+}
+
 function resume() {
   showScreen(null);
   game.paused = false;
 }
 
 function restartLevel() {
-  if (game.mode === 'uebung') return startLevel('uebung', game.index);
+  if (game.mode !== 'run') return startLevel(game.mode, game.index);
   // Im Run läuft die Zeit weiter – ein Neustart zählt wie ein Fehlversuch
   resetAttempt(game.s);
   game.tries++;
@@ -226,8 +353,17 @@ function handleEvents() {
   for (const e of s.events) {
     switch (e.type) {
       case 'start': game.started = true; break;
-      case 'schlag': ton(620, 0.07, 'sine', 0.14); vibe(8); break;
+      case 'schlag':
+        game.schlaege++;
+        game.torSchlaege++;
+        ton(620, 0.07, 'sine', 0.14);
+        vibe(8);
+        break;
+      case 'raus':
+        if (game.mode === 'training') goal();
+        break;
       case 'wand':
+        game.waende++;
         ton(e.left > 0 ? 240 : 180, 0.09, 'square', 0.07);
         vibe(25);
         game.sparks.push({ x: e.x, y: e.y, t: 0 });
@@ -251,7 +387,7 @@ function handleEvents() {
 /* ---------- Oberfläche ---------- */
 
 function showScreen(id) {
-  for (const sid of ['menue', 'uebung', 'dialog']) $(sid).hidden = sid !== id;
+  for (const sid of ['menue', 'uebung', 'einstellungen', 'dialog']) $(sid).hidden = sid !== id;
 }
 
 function dialog(title, rows, buttons) {
@@ -281,11 +417,55 @@ function dialog(title, rows, buttons) {
 function refreshMenu() {
   const run = store.best[bestKey('run')];
   $('run-best').textContent = run != null
-    ? `Bestzeit: ${zeit(run)} (Tempo ${store.settings.tempo} %)`
+    ? `Bestzeit: ${zeit(run)}`
     : `${LEVELS.length} Level am Stück, auf Zeit`;
-  $('steuerung').textContent = `Steuerung: ${STEUERUNGEN[store.settings.steuerung]}`;
-  $('tempo').textContent = `Tempo: ${store.settings.tempo} %`;
-  $('ton').textContent = `Ton: ${store.settings.ton ? 'an' : 'aus'}`;
+  $('einstellungen-kurz').textContent = settingsSummary();
+}
+
+let settingsFromGame = false;
+
+function openSettings(fromGame = false) {
+  settingsFromGame = fromGame;
+  renderSettings();
+  showScreen('einstellungen');
+}
+
+function renderSettings() {
+  const list = $('optionen-liste');
+  list.replaceChildren();
+  for (const o of OPTIONEN) {
+    const b = document.createElement('button');
+    const label = document.createElement('span');
+    label.textContent = o.label;
+    const val = document.createElement('span');
+    val.className = 'wert';
+    val.textContent = o.text(store.settings[o.key]);
+    b.append(label, val);
+    b.addEventListener('click', () => {
+      const i = o.values.indexOf(store.settings[o.key]);
+      store.settings[o.key] = o.values[(i + 1) % o.values.length];
+      save();
+      if (o.key === 'ton') unlockAudio();
+      renderSettings();
+    });
+    list.append(b);
+    if (o.info) {
+      const p = document.createElement('p');
+      p.className = 'klein info';
+      p.textContent = o.info(store.settings[o.key]);
+      list.append(p);
+    }
+  }
+}
+
+function closeSettings() {
+  if (settingsFromGame && game) {
+    applySettingsLive();
+    showPauseDialog();
+  } else {
+    refreshMenu();
+    showScreen('menue');
+  }
 }
 
 function openPractice() {
@@ -309,22 +489,13 @@ function openPractice() {
 $('run-start').addEventListener('click', () => { unlockAudio(); startLevel('run', 0); });
 $('uebung-oeffnen').addEventListener('click', () => { unlockAudio(); openPractice(); });
 $('uebung-zurueck').addEventListener('click', () => showScreen('menue'));
-$('steuerung').addEventListener('click', () => {
-  const keys = Object.keys(STEUERUNGEN);
-  store.settings.steuerung = keys[(keys.indexOf(store.settings.steuerung) + 1) % keys.length];
+$('training-start').addEventListener('click', () => { unlockAudio(); startTraining(); });
+$('einstellungen-oeffnen').addEventListener('click', () => openSettings(false));
+$('einstellungen-zurueck').addEventListener('click', closeSettings);
+$('einstellungen-standard').addEventListener('click', () => {
+  Object.assign(store.settings, STANDARD);
   save();
-  refreshMenu();
-});
-$('tempo').addEventListener('click', () => {
-  store.settings.tempo = TEMPI[(TEMPI.indexOf(store.settings.tempo) + 1) % TEMPI.length];
-  save();
-  refreshMenu();
-});
-$('ton').addEventListener('click', () => {
-  store.settings.ton = !store.settings.ton;
-  save();
-  refreshMenu();
-  unlockAudio();
+  renderSettings();
 });
 $('pause').addEventListener('click', pause);
 
@@ -334,8 +505,10 @@ function updateHud() {
   if (!game) return;
   const g = game;
   const t = g.mode === 'run' ? g.runSteps : g.levelSteps;
-  const info = `${g.mode === 'run' ? `Level ${g.index + 1}/${LEVELS.length}` : 'Übung'} · ${g.level.name} · Versuch ${g.tries}`;
-  const wl = g.s.wallLeft;
+  const info = g.mode === 'training'
+    ? `Training · ${g.tore} ${g.tore === 1 ? 'Tor' : 'Tore'} · ${g.torSchlaege} ${g.torSchlaege === 1 ? 'Schlag' : 'Schläge'}`
+    : `${g.mode === 'run' ? `Level ${g.index + 1}/${LEVELS.length}` : 'Übung'} · ${g.level.name} · Versuch ${g.tries}`;
+  const wl = Number.isFinite(g.s.wallLeft) ? g.s.wallLeft : '∞';
   const key = `${t}|${info}|${wl}`;
   if (key !== hudCache) {
     hudCache = key;
@@ -348,7 +521,13 @@ function updateHud() {
 
   const s = g.s;
   let title = '', text = '', cls = '';
-  if (s.phase === 'ready') {
+  if (g.torMsgT > 0) {
+    title = 'Tor!';
+    text = `${g.lastTorSchlaege} ${g.lastTorSchlaege === 1 ? 'Schlag' : 'Schläge'}`;
+    cls = 'tor';
+  } else if (s.phase === 'ready' && g.relaunchT >= 0) {
+    title = '';
+  } else if (s.phase === 'ready') {
     title = g.started ? 'Tippen zum Weiterspielen' : 'Tippen zum Start';
     text = g.started ? '' : g.level.hint;
   } else if (s.phase === 'fail') {
@@ -605,7 +784,7 @@ function drawPaddle(s) {
   const ring = s.rings[s.active];
   if (ring.goal) return;
   const pr = paddleRadius(ring);
-  const ph = paddleHalf(ring);
+  const ph = paddleHalf(ring, s.paddleLen);
   ctx.strokeStyle = COL.schlaeger;
   ctx.lineWidth = PADDLE_T;
   ctx.lineCap = 'round';
@@ -649,7 +828,7 @@ function drawDial(s) {
     ctx.arc(c.x, c.y, DIAL_R, ring.gap - ring.half, ring.gap + ring.half);
     ctx.stroke();
     ctx.setLineDash([]);
-    const ph = paddleHalf(ring);
+    const ph = paddleHalf(ring, s.paddleLen);
     ctx.strokeStyle = COL.schlaeger;
     ctx.lineWidth = 8;
     ctx.beginPath();
@@ -743,6 +922,12 @@ function frame(now) {
     }
     game.flash = Math.max(0, game.flash - dt * 3);
     game.wallAnim = Math.max(0, game.wallAnim - dt * 4);
+    game.torMsgT = Math.max(0, game.torMsgT - dt);
+    if (game.relaunchT >= 0) {
+      game.relaunchT -= dt;
+      if (game.s.phase !== 'ready') game.relaunchT = -1;
+      else if (game.relaunchT < 0) launch(game.s);
+    }
     for (const sp of game.sparks) sp.t += dt;
     game.sparks = game.sparks.filter(sp => sp.t < 0.45);
 
