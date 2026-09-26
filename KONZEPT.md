@@ -104,6 +104,8 @@ Gewünschte Gänsehaut-Momente (alle drei bestätigt):
 
 Umgesetzt: PWA-Grundgerüst, 3 Level (Erste Bahn, Versatz, Umkehr), Run-Modus mit Gesamtzeit, Übungsmodus, Bestzeiten, drei Steuerungsarten (Steuerkreis, Schieben, Zeigen), Tempo-Einstellung zum Testen, Klang, Tests mit Autopilot. Aufbau siehe `README.md`.
 
+**v0.3.1:** Steuerung „Schieben“ zählt nur noch die waagrechte Wischbewegung mit fester Drehrichtung (Standard: nach links = im Uhrzeigersinn, in den Einstellungen umkehrbar). Vorher wurde die Bewegung auf die Schiene projiziert, wodurch sich die Richtung an den Seiten umkehrte.
+
 **v0.3 – Abprall und Training:**
 - Abprall ist jetzt einstellbar. **Standard: Mischung** – erst Spiegelung (Einfallswinkel = Ausfallswinkel), dann lenkt die Trefferstelle nach (Standard 25° am Rand, höchstens 80° zur Senkrechten). Alternativen zum Vergleich: **Pong** (nur Trefferstelle) und **Physik** (nur Spiegelung – da der Schläger ein Stück des Rings ist, kann man damit nicht zielen; deshalb braucht es das Nachlenken).
 - **Richtung der Ablenkung umkehrbar** (Treffer rechts lenkt nach links). Idee für ein späteres **Reverse-Level**: Leveldaten können den Abprall mit `bounce: { reverse: true }` festlegen.

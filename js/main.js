@@ -35,6 +35,9 @@ const GOLDEN = 137.508;     // Training: so weit wandert das Tor nach jedem Tref
 const OPTIONEN = [
   { key: 'steuerung', label: 'Steuerung', values: ['kreis', 'schieben', 'zeigen'],
     text: v => ({ kreis: 'Steuerkreis', schieben: 'Schieben', zeigen: 'Zeigen' })[v] },
+  { key: 'schiebeRichtung', label: 'Schieben nach links', values: ['links-uhr', 'links-gegen'],
+    text: v => v === 'links-uhr' ? 'im Uhrzeigersinn' : 'gegen den Uhrzeigersinn',
+    info: () => 'Gilt für die Steuerung „Schieben“: Nur die waagrechte Wischbewegung zählt.' },
   { key: 'tempo', label: 'Tempo', values: [50, 60, 70, 80, 90, 100, 110, 120], text: v => `${v} %` },
   { key: 'abprall', label: 'Abprall', values: ['mix', 'pong', 'physik'],
     text: v => ({ mix: 'Mischung', pong: 'Pong', physik: 'Physik' })[v],
@@ -56,7 +59,7 @@ const OPTIONEN = [
   { key: 'ton', label: 'Ton & Vibration', values: [true, false], text: v => v ? 'an' : 'aus' },
 ];
 const STANDARD = {
-  steuerung: 'kreis', tempo: 70, abprall: 'mix', ablenkung: 25, richtung: 'normal',
+  steuerung: 'kreis', schiebeRichtung: 'links-uhr', tempo: 70, abprall: 'mix', ablenkung: 25, richtung: 'normal',
   schlaeger: 92, tor: 12, ton: true,
 };
 
@@ -652,12 +655,11 @@ canvas.addEventListener('pointermove', e => {
   } else if (st === 'zeigen') {
     aimAt(e);
   } else {
-    // Schieben: Fingerbewegung entlang der Schiene projizieren
+    // Schieben: nur die waagrechte Bewegung zählt, mit fester Drehrichtung
+    // (Standard: nach links = im Uhrzeigersinn; auf dem Bildschirm mit y nach unten heißt das: Winkel wird größer)
     const wx = (e.clientX - lastPt.x) / cam.z;
-    const wy = (e.clientY - lastPt.y) / cam.z;
-    const p = s.paddle;
-    const along = wx * -Math.sin(p) + wy * Math.cos(p);
-    nudgePaddle(s, along / paddleRadius(s.rings[s.active]) * SCHIEBE_GAIN);
+    const dir = store.settings.schiebeRichtung === 'links-gegen' ? 1 : -1;
+    nudgePaddle(s, dir * wx / paddleRadius(s.rings[s.active]) * SCHIEBE_GAIN);
   }
   lastPt = { x: e.clientX, y: e.clientY };
 });

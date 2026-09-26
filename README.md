@@ -12,7 +12,7 @@ Das vollständige Spielkonzept steht in [`KONZEPT.md`](KONZEPT.md).
 - Schläger auf der Kreisschiene, Ball mit deterministischer Physik
 - Begrenzte Wandberührungen pro Level, Neustart nach Fehler, Bestzeiten auf dem Gerät (je Tempo)
 - Steuerung **Steuerkreis** (Kreis unten, der Daumen verdeckt das Spielfeld nicht),
-  **Schieben** (Finger irgendwo bewegen, der Schläger folgt entlang der Schiene)
+  **Schieben** (waagrecht wischen: nach links = im Uhrzeigersinn, umkehrbar)
   oder **Zeigen** (Schläger fährt in Richtung des Fingers)
 - **Training**: großer Ring, unbegrenzte Wandtreffer, kleines Tor, Statistik
 - **Einstellungen** zum Testen: Tempo, Abprall (Mischung/Pong/Physik), Ablenkung, Richtung, Schlägerlänge, Torgröße
